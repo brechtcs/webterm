@@ -3,13 +3,13 @@ import morph from './vendor/nanomorph-v5.1.3.js'
 import minimist from './vendor/minimist-v1.2.0.js'
 import {importModule} from './vendor/dynamic-import-polyfill.js'
 import {joinPath} from './util.js'
-const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor
 
 // globals
 // =
 
 var cwd // current working directory. {url:, host:, pathname:, archive:}
 var env // current working environment
+var mod // current command module
 
 var commandHist = {
   array: new Array(),
@@ -140,37 +140,37 @@ function evalPrompt () {
   prompt.value = ''
 }
 
-function evalCommand (command) {
-  evalCommandInternal(command, appendOutput, appendError, env, parseCommand, updatePrompt)  
-}
-
-// use the func constructor to relax 'use strict'
-// that way we can use `with`
-var evalCommandInternal = new AsyncFunction('command', 'appendOutput', 'appendError', 'env', 'parseCommand', 'updatePrompt', `
+async function evalCommand (command) {
   try {
     var res
     var oldCWD = Object.assign({}, env.getCWD())
-    with (env) {
-      res = await eval(parseCommand(command))
-    }
+    res = await eval(await parseCommand(command))
     appendOutput(res, oldCWD, command)
   } catch (err) {
+    console.error(err)
     appendError('Command error', err, oldCWD, command)
   }
   updatePrompt()
-`)
+}
 
-function parseCommand (str) {
+async function parseCommand (str) {
   // parse the command
   var parts = str.split(' ')
-  var cmd = parts[0]
-  var argsParsed = minimist(parts.slice(1))
-  console.log(JSON.stringify(argsParsed))
+  var cmd = parts.shift() 
+
+  // load command if not in env
+  if (cmd in env) {
+    cmd = `env.${cmd}`
+  } else {
+    mod = await importModule(joinPath(env.pwd(), `${cmd}.js`))
+    cmd = `mod.${mod[parts[0]] ? parts.shift() : 'default'}`
+  }
 
   // form the js call
-  var args = argsParsed._
-  delete argsParsed._
-  args.unshift(argsParsed) // opts always go first
+  var parsed = minimist(parts)
+  var args = parsed._
+  delete parsed._
+  args.unshift(parsed) // opts always go first
 
   console.log(`${cmd}(${args.map(JSON.stringify).join(', ')})`)
   return `${cmd}(${args.map(JSON.stringify).join(', ')})`
