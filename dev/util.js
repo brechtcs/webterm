@@ -17,14 +17,12 @@ export function parseCommand (str) {
   var parts = str.split(' ')
   var cmd = parts.shift()
 
-  // form the args string
+  // form the args list
   var opts = minimist(parts)
-  var argList = opts._
+  var args = opts._
   delete opts._
-  argList.unshift(opts) // opts always go first
-  var args = argList.map(JSON.stringify).join(', ')
 
-  return {cmd, args}
+  return {cmd, args, opts}
 }
 
 export function parseUrl (url) {

@@ -144,11 +144,21 @@ function evalPrompt () {
 
 async function evalCommand (command) {
   try {
+    var js, module
     var oldCWD = Object.assign({}, env.getCWD())
-    var {cmd, args} = parseCommand(command)
+    var {cmd, args, opts} = parseCommand(command)
 
-    var js = `env.${cmd}(${args})`
+    if (cmd in env) {
+      cmd = `env.${cmd}`
+    } else {
+      module = await importModule(joinPath(env.pwd(), `${cmd}.js`))
+      cmd = `module.${module[args[0]] ? args.shift() : 'default'}`
+    }
+
+    args.unshift(opts) // opts always go first
+    js = `${cmd}(${args.map(JSON.stringify).join(', ')})`
     console.log(js)
+
     var res = await eval(js)
     appendOutput(res, oldCWD, command)
   } catch (err) {
