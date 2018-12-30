@@ -12,8 +12,6 @@ export function joinPath (left, right) {
   return left + right
 }
 
-export function noop () {}
-
 export function parseCommand (str) {
   // parse the command
   var parts = str.split(' ')
@@ -28,7 +26,7 @@ export function parseCommand (str) {
   return `env.${cmd}(${args.map(JSON.stringify).join(', ')})`
 }
 
-export function parseURL (url) {
+export function parseUrl (url) {
   if (!url.startsWith('dat://')) url = 'dat://' + url
   let urlp = new URL(url)
   let archive = new DatArchive(urlp.hostname)
