@@ -1,9 +1,7 @@
 import html from './vendor/nanohtml-v1.2.4.js'
 import morph from './vendor/nanomorph-v5.1.3.js'
-import minimist from './vendor/minimist-v1.2.0.js'
 import {importModule} from './vendor/dynamic-import-polyfill.js'
-import {joinPath} from './util.js'
-const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor
+import {joinPath, parseCommand, parseUrl} from './util.js'
 
 // globals
 // =
@@ -144,40 +142,19 @@ function evalPrompt () {
   prompt.value = ''
 }
 
-function evalCommand (command) {
-  evalCommandInternal(command, appendOutput, appendError, env, parseCommand, updatePrompt)  
-}
-
-// use the func constructor to relax 'use strict'
-// that way we can use `with`
-var evalCommandInternal = new AsyncFunction('command', 'appendOutput', 'appendError', 'env', 'parseCommand', 'updatePrompt', `
+async function evalCommand (command) {
   try {
-    var res
     var oldCWD = Object.assign({}, env.getCWD())
-    with (env) {
-      res = await eval(parseCommand(command))
-    }
+    var {cmd, args} = parseCommand(command)
+
+    var js = `env.${cmd}(${args})`
+    console.log(js)
+    var res = await eval(js)
     appendOutput(res, oldCWD, command)
   } catch (err) {
     appendError('Command error', err, oldCWD, command)
   }
   updatePrompt()
-`)
-
-function parseCommand (str) {
-  // parse the command
-  var parts = str.split(' ')
-  var cmd = parts[0]
-  var argsParsed = minimist(parts.slice(1))
-  console.log(JSON.stringify(argsParsed))
-
-  // form the js call
-  var args = argsParsed._
-  delete argsParsed._
-  args.unshift(argsParsed) // opts always go first
-
-  console.log(`${cmd}(${args.map(JSON.stringify).join(', ')})`)
-  return `${cmd}(${args.map(JSON.stringify).join(', ')})`
 }
 
 // environment
@@ -226,19 +203,10 @@ async function setCWD (location) {
 }
 
 function readCWD () {
-  cwd = parseURL(window.location.hash.slice(1) || window.location.toString())
+  cwd = parseUrl(window.location.hash.slice(1) || window.location.toString())
 
   console.log('CWD', cwd)
   document.title = `${cwd.host || cwd.url} | Terminal`
-}
-
-function parseURL (url) {
-  if (!url.startsWith('dat://')) url = 'dat://' + url
-  let urlp = new URL(url)
-  let host = url.slice(0, url.indexOf('/'))
-  let pathname = url.slice(url.indexOf('/'))
-  let archive = new DatArchive(urlp.hostname)
-  return {url, host: urlp.hostname, pathname: urlp.pathname, archive}
 }
 
 // builtins
